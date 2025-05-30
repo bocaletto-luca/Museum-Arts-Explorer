@@ -28,26 +28,51 @@
     #searchForm {
       margin-bottom: 20px;
     }
-    /* Artwork Grid / Griglia degli artwork */
+    /* Artwork Card Styles / Stili della scheda delle opere */
     .artwork-card {
+      display: flex;
+      flex-direction: column;
+      height: 400px; /* Fixed height for uniform appearance / Altezza fissa per uniformità */
       border: 1px solid #dee2e6;
       border-radius: 0.25rem;
       background-color: #fff;
-      padding: 10px;
-      margin-bottom: 20px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      overflow: hidden;
     }
     .artwork-card img {
-      width: 100%;
       height: 200px;
+      width: 100%;
       object-fit: cover;
-      border-radius: 0.25rem;
     }
-    .artwork-card h5 {
-      margin-top: 10px;
+    /* Info container uses flex to spread content, ensuring button alignment / Contenitore info usa flex per distribuire il contenuto */
+    .artwork-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px;
+    }
+    .artwork-info h5 {
       font-size: 1.1rem;
+      margin: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
-    /* Modal Map Container styling / Stile del contenitore della mappa nel modal */
+    .artwork-info p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #555;
+    }
+    .artwork-info .btn {
+      align-self: flex-end;
+      margin-top: 5px;
+    }
+    /* Pagination Styles / Stili per la paginazione */
+    .pagination {
+      margin-top: 20px;
+    }
+    /* Modal Image Styles / Stile per l'immagine nel modal */
     #detailImage {
       width: 100%;
       max-height: 500px;
@@ -64,7 +89,6 @@
       <h1>Museum Art Explorer</h1>
       <!-- (Italian: Esplora le opere d'arte del Museo Metropolitano) -->
     </header>
-
     <!-- Search Form / Modulo di Ricerca -->
     <div id="searchForm" class="container">
       <div class="row justify-content-center">
@@ -76,13 +100,15 @@
         </div>
       </div>
     </div>
-
     <!-- Results Container / Contenitore dei Risultati -->
     <div id="results" class="container">
-      <!-- Artwork cards will be appended here -->
+      <!-- Artwork cards will be appended here / Le schede delle opere verranno inserite qui -->
     </div>
+    <!-- Pagination Controls / Controlli di Pagina -->
+    <nav id="paginationNav" class="container">
+      <!-- Pagination will be generated here / La paginazione verrà generata qui -->
+    </nav>
   </div>
-
   <!-- Fullscreen Modal for Artwork Details / Modal a schermo intero per Dettagli Opera -->
   <div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen modal-dialog-centered">
@@ -92,25 +118,23 @@
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
         <div class="modal-body" id="modalDetailContent">
-          <!-- Detailed artwork data will be loaded here -->
+          <!-- Detailed artwork data will be loaded here / I dettagli dell'opera verranno caricati qui -->
         </div>
       </div>
     </div>
   </div>
-
   <!-- Bootstrap Bundle JS (includes Popper.js) / Script di Bootstrap (incluso Popper.js) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  
   <!-- Main JavaScript / Script Principale -->
   <script>
-    // ===========================
     // Global Variables / Variabili Globali
-    // ===========================
     const resultsDiv = document.getElementById("results");
+    const paginationNav = document.getElementById("paginationNav");
+    let artworksData = [];
+    let currentPage = 1;
+    const pageSize = 12; // Number of artworks per page / Numero di opere per pagina
 
-    // ===========================
-    // Event Listener for Search / Gestione evento per la ricerca
-    // ===========================
+    // Event Listener for Search / Gestione dell'evento di ricerca
     document.getElementById("btnSearch").addEventListener("click", async () => {
       const query = document.getElementById("searchInput").value.trim();
       if (!query) {
@@ -118,42 +142,55 @@
         return;
       }
       resultsDiv.innerHTML = "<p>Loading artworks...</p>";
+      paginationNav.innerHTML = "";
       try {
-        // Call the search endpoint (only artworks with images)
-        // (Italian: Chiamata all'endpoint di ricerca con immagini)
-        const searchResponse = await fetch("https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=" + encodeURIComponent(query));
+        // Call the Met's Collection API search endpoint with hasImages=true
+        const searchUrl = "https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=" + encodeURIComponent(query);
+        const searchResponse = await fetch(searchUrl);
         const searchData = await searchResponse.json();
         if (!searchData.total || searchData.total === 0) {
-          resultsDiv.innerHTML = "<p>No art works found for this keyword.</p>";
+          resultsDiv.innerHTML = "<p>No artworks found for this keyword.</p>";
           return;
         }
-        // Limit to first 12 results for demo purposes
-        const objectIDs = searchData.objectIDs.slice(0, 12);
-        // Fetch details for each object concurrently
+        // Limit results to first 50 for performance reasons
+        const objectIDs = searchData.objectIDs.slice(0, 50);
+        // Fetch details for each artwork concurrently
         const detailPromises = objectIDs.map(id => fetch("https://collectionapi.metmuseum.org/public/collection/v1/objects/" + id).then(res => res.json()));
-        const artworks = await Promise.all(detailPromises);
-        displayArtworks(artworks);
+        artworksData = await Promise.all(detailPromises);
+        currentPage = 1;
+        renderPage(currentPage);
       } catch (error) {
         console.error(error);
         resultsDiv.innerHTML = "<p>Error retrieving artworks. Please try again later.</p>";
       }
     });
 
-    // ===========================
-    // Function to Display Artworks / Funzione per visualizzare le opere
-    // ===========================
+    // Render a page of artworks / Funzione per visualizzare una pagina di opere
+    function renderPage(page) {
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize;
+      const pageArtworks = artworksData.slice(start, end);
+      displayArtworks(pageArtworks);
+      renderPagination();
+    }
+
+    // Display artworks in a grid / Visualizza le opere in una griglia
     function displayArtworks(artworks) {
       let html = '<div class="row">';
       artworks.forEach(artwork => {
-        // Use primaryImageSmall (or primaryImage if available) as thumbnail
-        const thumb = artwork.primaryImageSmall || artwork.primaryImage || "";
+        // Use primaryImageSmall if available; fallback to primaryImage or a placeholder
+        const thumb = artwork.primaryImageSmall || artwork.primaryImage || "https://via.placeholder.com/300x200?text=No+Image";
         html += `
-          <div class="col-md-4">
-            <div class="artwork-card">
+          <div class="col-md-4 mb-3">
+            <div class="artwork-card d-flex flex-column">
               <img src="${thumb}" alt="${artwork.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" />
-              <h5>${artwork.title || "Unknown Title"}</h5>
-              <p>${artwork.artistDisplayName || "Unknown Artist"}</p>
-              <button class="btn btn-info btn-sm" onclick='showDetails(${JSON.stringify(artwork)})'>View Details</button>
+              <div class="artwork-info">
+                <div>
+                  <h5 title="${artwork.title}">${artwork.title || "Unknown Title"}</h5>
+                  <p>${artwork.artistDisplayName || "Unknown Artist"}</p>
+                </div>
+                <button class="btn btn-info btn-sm" onclick='showDetails(${JSON.stringify(artwork)})'>View Details</button>
+              </div>
             </div>
           </div>
         `;
@@ -162,11 +199,42 @@
       resultsDiv.innerHTML = html;
     }
 
-    // ===========================
-    // Function to Show Artwork Details in Modal / Funzione per mostrare i dettagli dell'opera nel modal
-    // ===========================
+    // Render pagination controls / Renderizza i controlli di paginazione
+    function renderPagination() {
+      const totalPages = Math.ceil(artworksData.length / pageSize);
+      if (totalPages <= 1) {
+        paginationNav.innerHTML = "";
+        return;
+      }
+      let paginationHTML = '<ul class="pagination justify-content-center">';
+      // Previous button
+      paginationHTML += `<li class="page-item ${currentPage === 1 ? "disabled" : ""}">
+                           <button class="page-link" onclick="changePage(${currentPage - 1})">Previous</button>
+                         </li>`;
+      // Page numbers
+      for (let i = 1; i <= totalPages; i++) {
+        paginationHTML += `<li class="page-item ${currentPage === i ? "active" : ""}">
+                             <button class="page-link" onclick="changePage(${i})">${i}</button>
+                           </li>`;
+      }
+      // Next button
+      paginationHTML += `<li class="page-item ${currentPage === totalPages ? "disabled" : ""}">
+                           <button class="page-link" onclick="changePage(${currentPage + 1})">Next</button>
+                         </li>`;
+      paginationHTML += "</ul>";
+      paginationNav.innerHTML = paginationHTML;
+    }
+
+    // Change the current page / Cambia pagina
+    function changePage(page) {
+      const totalPages = Math.ceil(artworksData.length / pageSize);
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      renderPage(currentPage);
+    }
+
+    // Show artwork details in a fullscreen modal / Mostra i dettagli dell'opera in un modal a schermo intero
     function showDetails(artwork) {
-      // Build modal content with artwork details and a large image if available
       const imageUrl = artwork.primaryImage || "https://via.placeholder.com/600x400?text=No+Image";
       const content = `
         <div class="container-fluid">
