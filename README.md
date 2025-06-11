@@ -7,6 +7,8 @@
 [![Bootstrap 5](https://img.shields.io/badge/Bootstrap-7952B3.svg?style=flat)](https://getbootstrap.com/)
 [![License: GPL](https://img.shields.io/badge/License-GPL-blue.svg)](LICENSE)
 
+[![Online Demo](https://img.shields.io/badge/Online-Demo-blue?style=for-the-badge&logo=google-chrome&logoColor=white)](https://bocaletto-luca.github.io/Museum-Arts-Explorer/)
+
 ## Overview  
 
 **Museum Art Explorer** is a free and open-source web application that allows users to search, explore, and view detailed information on artworks from The Metropolitan Museum of Art Collection. The app uses the [Metropolitan Museum of Art Collection API](https://metmuseum.github.io/)—a fully free API that requires no registration—and is built with HTML, CSS, JavaScript, and Bootstrap 5.
